@@ -23,8 +23,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string>
-#include <map>
 
 #include <poll.h>
 #include <sys/time.h>
@@ -45,7 +43,7 @@ extern "C"
 {
     extern void coctx_swap( coctx_t *,coctx_t* ) asm("coctx_swap");
 };
-using namespace std;
+
 stCoRoutine_t *GetCurrCo( stCoRoutineEnv_t *env );
 struct stCoEpoll_t;
 
@@ -310,6 +308,9 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 {
 
     stCoRoutineAttr_t at;
+    at.stack_size = 128 * 1024;
+    at.share_stack = NULL;
+
     if( attr )
     {
         memcpy( &at,attr,sizeof(at) );

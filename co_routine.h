@@ -32,11 +32,6 @@ struct stCoRoutineAttr_t
 {
     int stack_size;
     stShareStack_t*  share_stack;
-    stCoRoutineAttr_t()
-    {
-        stack_size = 128 * 1024;
-        share_stack = NULL;
-    }
 }__attribute__ ((packed));
 
 struct stCoEpoll_t;

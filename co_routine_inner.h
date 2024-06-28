@@ -71,7 +71,6 @@ struct stCoRoutine_t
 	char* save_buffer;
 
 	stCoSpec_t aSpec[1024];
-
 };
 
 
