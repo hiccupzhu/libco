@@ -115,157 +115,6 @@ static unsigned long long GetTickMS()
 #endif
 }
 
-/* no longer use
-static pid_t GetPid()
-{
-    static __thread pid_t pid = 0;
-    static __thread pid_t tid = 0;
-    if( !pid || !tid || pid != getpid() )
-    {
-        pid = getpid();
-#if defined( __APPLE__ )
-        tid = syscall( SYS_gettid );
-        if( -1 == (long)tid )
-        {
-            tid = pid;
-        }
-#elif defined( __FreeBSD__ )
-        syscall(SYS_thr_self, &tid);
-        if( tid < 0 )
-        {
-            tid = pid;
-        }
-#else 
-        tid = syscall( __NR_gettid );
-#endif
-
-    }
-    return tid;
-
-}
-static pid_t GetPid()
-{
-    char **p = (char**)pthread_self();
-    return p ? *(pid_t*)(p + 18) : getpid();
-}
-*/
-template <class T,class TLink>
-void RemoveFromLink(T *ap)
-{
-    TLink *lst = ap->pLink;
-    if(!lst) return ;
-    assert( lst->head && lst->tail );
-
-    if( ap == lst->head )
-    {
-        lst->head = ap->pNext;
-        if(lst->head)
-        {
-            lst->head->pPrev = NULL;
-        }
-    }
-    else
-    {
-        if(ap->pPrev)
-        {
-            ap->pPrev->pNext = ap->pNext;
-        }
-    }
-
-    if( ap == lst->tail )
-    {
-        lst->tail = ap->pPrev;
-        if(lst->tail)
-        {
-            lst->tail->pNext = NULL;
-        }
-    }
-    else
-    {
-        ap->pNext->pPrev = ap->pPrev;
-    }
-
-    ap->pPrev = ap->pNext = NULL;
-    ap->pLink = NULL;
-}
-
-template <class TNode,class TLink>
-void inline AddTail(TLink*apLink,TNode *ap)
-{
-    if( ap->pLink )
-    {
-        return ;
-    }
-    if(apLink->tail)
-    {
-        apLink->tail->pNext = (TNode*)ap;
-        ap->pNext = NULL;
-        ap->pPrev = apLink->tail;
-        apLink->tail = ap;
-    }
-    else
-    {
-        apLink->head = apLink->tail = ap;
-        ap->pNext = ap->pPrev = NULL;
-    }
-    ap->pLink = apLink;
-}
-template <class TNode,class TLink>
-void inline PopHead( TLink*apLink )
-{
-    if( !apLink->head ) 
-    {
-        return ;
-    }
-    TNode *lp = apLink->head;
-    if( apLink->head == apLink->tail )
-    {
-        apLink->head = apLink->tail = NULL;
-    }
-    else
-    {
-        apLink->head = apLink->head->pNext;
-    }
-
-    lp->pPrev = lp->pNext = NULL;
-    lp->pLink = NULL;
-
-    if( apLink->head )
-    {
-        apLink->head->pPrev = NULL;
-    }
-}
-
-template <class TNode,class TLink>
-void inline Join( TLink*apLink,TLink *apOther )
-{
-    //printf("apOther %p\n",apOther);
-    if( !apOther->head )
-    {
-        return ;
-    }
-    TNode *lp = apOther->head;
-    while( lp )
-    {
-        lp->pLink = apLink;
-        lp = lp->pNext;
-    }
-    lp = apOther->head;
-    if(apLink->tail)
-    {
-        apLink->tail->pNext = (TNode*)lp;
-        lp->pPrev = apLink->tail;
-        apLink->tail = apOther->tail;
-    }
-    else
-    {
-        apLink->head = apOther->head;
-        apLink->tail = apOther->tail;
-    }
-
-    apOther->head = apOther->tail = NULL;
-}
-
 /////////////////for copy stack //////////////////////////
 stStackMem_t* co_alloc_stackmem(unsigned int stack_size)
 {
@@ -402,7 +251,7 @@ int AddTimeout( stTimeout_t *apTimeout, stTimeoutItem_t *apItem ,unsigned long l
 
         //return __LINE__;
     }
-    //AddTail( apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize , apItem );
+
     apItem->pLink = apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize;
     dq_addlast(&apItem->entry, apItem->pLink);
 
@@ -432,7 +281,6 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
     for( int i = 0;i<cnt;i++)
     {
         int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
-        //Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
         dq_cat(apTimeout->pItems + idx, apResult);
     }
     apTimeout->ullStart = allNow;
@@ -565,8 +413,6 @@ void co_resume( stCoRoutine_t *co )
     }
     env->pCallStack[ env->iCallStackSize++ ] = co;
     co_swap( lpCurrRoutine, co );
-
-
 }
 
 
@@ -783,8 +629,6 @@ void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemL
     {
         pPoll->iAllEventDetach = 1;
 
-        //RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( pPoll );
-        //AddTail(active, pPoll);
         dq_rem(&pPoll->entry, pPoll->pLink);
         pPoll->pLink = active;
         dq_addlast(&pPoll->entry, pPoll->pLink);
@@ -819,7 +663,6 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
             }
             else
             {
-                //AddTail( active,item );
                 item->pLink = active;
                 dq_addlast(&item->entry, active);
             }
@@ -838,13 +681,11 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
         }
 
         dq_cat(timeout, active);
-        //Join<stTimeoutItem_t,stTimeoutItemLink_t>( active,timeout );
 
         lp = (stTimeoutItem_t *)active->head;
         while( lp )
         {
 
-            //PopHead<stTimeoutItem_t,stTimeoutItemLink_t>( active );
             dq_remfirst(active);
             if (lp->bTimeout && now < lp->ullExpireTime) 
             {
@@ -1008,7 +849,6 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
     {
         //clear epoll status and memory
-        //RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
         dq_rem(&arg.entry, arg.pLink);
         for(nfds_t i = 0;i < nfds;i++)
         {
@@ -1122,10 +962,9 @@ int co_cond_signal( stCoCond_t *list )
     if (!sp) {
         return 0;
     }
-    //RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &sp->timeout );
+
     dq_rem(&sp->timeout.entry, sp->timeout.pLink);
 
-    //AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );
     sp->pLink = co_get_curr_thread_env()->pEpoll->pstActiveList;
     dq_addlast(&sp->timeout.entry, sp->pLink);
 
@@ -1138,10 +977,8 @@ int co_cond_broadcast( stCoCond_t *list )
         if (!sp)
             return 0;
 
-        //RemoveFromLink<stTimeoutItem_t, stTimeoutItemLink_t>(&sp->timeout);
         dq_rem(&sp->timeout.entry, sp->timeout.pLink);
 
-        //AddTail(co_get_curr_thread_env()->pEpoll->pstActiveList, &sp->timeout);
         sp->pLink = co_get_curr_thread_env()->pEpoll->pstActiveList;
         dq_addlast(&sp->timeout.entry, sp->pLink);
     }
@@ -1167,14 +1004,12 @@ int co_cond_timedwait( dq_queue_t *link, int ms )
             return ret;
         }
     }
-    //AddTail( link, psi);
+
     psi->pLink = link;
     dq_addlast(&psi->entry, psi->pLink);
 
     co_yield_ct();
 
-
-    // RemoveFromLink<stCoCondItem_t,stCoCond_t>( psi );
     dq_rem(&psi->entry, link);
     free(psi);
 
