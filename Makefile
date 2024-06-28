@@ -24,7 +24,7 @@ v=debug
 include co.mk
 
 ########## options ##########
-CFLAGS += -g -fno-strict-aliasing -O2 -Wall -export-dynamic \
+CFLAGS += -g -fno-strict-aliasing -O0 -Wall -export-dynamic \
 	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
 
 UNAME := $(shell uname -s)
@@ -42,7 +42,7 @@ PROGS = colib example_poll example_echosvr example_echocli example_thread  examp
 
 all:$(PROGS)
 
-colib:libcolib.a libcolib.so
+colib:libcolib.a #libcolib.so
 
 libcolib.a: $(COLIB_OBJS)
 	$(ARSTATICLIB) 

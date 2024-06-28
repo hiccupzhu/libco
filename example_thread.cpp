@@ -39,7 +39,8 @@ static void *routine_func( void * )
 }
 int main(int argc,char *argv[])
 {
-	int cnt = atoi( argv[1] );
+	//int cnt = atoi( argv[1] );
+	int cnt = 2;
 
 	pthread_t tid[ cnt ];
 	for(int i=0;i<cnt;i++)

@@ -316,8 +316,10 @@ struct stCoEpoll_t
 
 	struct stTimeout_t *pTimeout;
 
+	// 仅在epoll_wait的时候，作为临时变量使用
 	struct stTimeoutItemLink_t *pstTimeoutList;
 
+	// 仅在cond signal 和 broadcast的时候使用
 	struct stTimeoutItemLink_t *pstActiveList;
 
 	co_epoll_res *result; 
