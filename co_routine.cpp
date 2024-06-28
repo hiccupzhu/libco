@@ -162,7 +162,8 @@ struct stCoEpoll_t
     int iEpollFd;
     static const int _EPOLL_SIZE = 1024 * 10;
 
-    // 作用是啥？
+    // alloc 60s array for timeout-queue
+    // every 1ms one pointer
     struct stTimeout_t *pTimeout;
 
     // 仅在epoll_wait的时候，作为临时变量使用
@@ -220,6 +221,9 @@ void FreeTimeout( stTimeout_t *apTimeout )
     free( apTimeout->pItems );
     free ( apTimeout );
 }
+
+// 添加超时事件
+// return 0 success, otherwize failed.
 int AddTimeout( stTimeout_t *apTimeout, stTimeoutItem_t *apItem ,unsigned long long allNow )
 {
     if( apTimeout->ullStart == 0 )
@@ -729,6 +733,8 @@ stCoEpoll_t *AllocEpoll()
     stCoEpoll_t *ctx = (stCoEpoll_t*)calloc( 1,sizeof(stCoEpoll_t) );
 
     ctx->iEpollFd = co_epoll_create( stCoEpoll_t::_EPOLL_SIZE );
+    // alloc 60s array for timeout-queue
+    // every 1ms one pointer
     ctx->pTimeout = AllocTimeout( 60 * 1000 );
     
     ctx->pstActiveList = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) );

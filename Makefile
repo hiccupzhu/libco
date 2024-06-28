@@ -55,7 +55,7 @@ coctx_swap.o: coctx_swap.S
 coctx.o: coctx.cpp
 	$(CPPCOMPILE)
 
-co_comm.o: co_comm.cpp co_comm.h
+co_comm.o: co_comm.cpp co_comm.h co_routine.h
 	$(CPPCOMPILE)
 
 COLIB_OBJS=co_epoll.o co_routine.o co_hook_sys_call.o coctx_swap.o coctx.o co_comm.o

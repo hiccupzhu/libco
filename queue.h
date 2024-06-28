@@ -219,7 +219,7 @@
         }                                   \
     } while (0)
 
-// q2 <- q1 
+// q1 -> q2 
 #define dq_cat(q1, q2)                      \
     do {                                    \
         if (dq_empty(q2)) {                 \
