@@ -39,6 +39,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <limits.h>
+#include "queue.h"
 
 extern "C"
 {
@@ -307,7 +308,7 @@ static stStackMem_t* co_get_stackmem(stShareStack_t* share_stack)
 
 
 // ----------------------------------------------------------------------------
-struct stTimeoutItemLink_t;
+typedef struct dq_queue_s stTimeoutItemLink_t;
 struct stTimeoutItem_t;
 struct stCoEpoll_t
 {
@@ -317,44 +318,37 @@ struct stCoEpoll_t
     struct stTimeout_t *pTimeout;
 
     // 仅在epoll_wait的时候，作为临时变量使用
-    struct stTimeoutItemLink_t *pstTimeoutList;
+    stTimeoutItemLink_t *pstTimeoutList;
 
     // 仅在cond signal 和 broadcast的时候使用
-    struct stTimeoutItemLink_t *pstActiveList;
+    stTimeoutItemLink_t *pstActiveList;
 
     co_epoll_res *result; 
 
 };
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
 typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
+
+#define ST_TIMEOUT_ITEM_COMMON                \
+    dq_entry_t entry;                         \
+    enum { eMaxTimeout = 40 * 1000 /*40s*/ }; \
+    stTimeoutItemLink_t *pLink;               \
+                                              \
+    unsigned long long ullExpireTime;         \
+    OnPreparePfn_t pfnPrepare;                \
+    OnProcessPfn_t pfnProcess;                \
+                                              \
+    void *pArg; /*routine*/                   \
+    bool bTimeout
+
 struct stTimeoutItem_t
 {
-
-    enum
-    {
-        eMaxTimeout = 40 * 1000 //40s
-    };
-    stTimeoutItem_t *pPrev;
-    stTimeoutItem_t *pNext;
-    stTimeoutItemLink_t *pLink;
-
-    unsigned long long ullExpireTime;
-
-    OnPreparePfn_t pfnPrepare;
-    OnProcessPfn_t pfnProcess;
-
-    void *pArg; // routine 
-    bool bTimeout;
+    ST_TIMEOUT_ITEM_COMMON;
 };
-struct stTimeoutItemLink_t
-{
-    stTimeoutItem_t *head;
-    stTimeoutItem_t *tail;
 
-};
 struct stTimeout_t
 {
-    stTimeoutItemLink_t *pItems;
+    dq_queue_s *pItems;
     int iItemSize;
 
     unsigned long long ullStart;
@@ -377,7 +371,7 @@ void FreeTimeout( stTimeout_t *apTimeout )
     free( apTimeout->pItems );
     free ( apTimeout );
 }
-int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long long allNow )
+int AddTimeout( stTimeout_t *apTimeout, stTimeoutItem_t *apItem ,unsigned long long allNow )
 {
     if( apTimeout->ullStart == 0 )
     {
@@ -408,7 +402,9 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 
         //return __LINE__;
     }
-    AddTail( apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize , apItem );
+    //AddTail( apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize , apItem );
+    apItem->pLink = apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize;
+    dq_addlast(&apItem->entry, apItem->pLink);
 
     return 0;
 }
@@ -436,7 +432,8 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
     for( int i = 0;i<cnt;i++)
     {
         int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
-        Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
+        //Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
+        dq_cat(apTimeout->pItems + idx, apResult);
     }
     apTimeout->ullStart = allNow;
     apTimeout->llStartIdx += cnt - 1;
@@ -685,8 +682,10 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 //int poll(struct pollfd fds[], nfds_t nfds, int timeout);
 // { fd,events,revents }
 struct stPollItem_t ;
-struct stPoll_t : public stTimeoutItem_t 
+struct stPoll_t
 {
+    ST_TIMEOUT_ITEM_COMMON;
+
     struct pollfd *fds;
     nfds_t nfds; // typedef unsigned long int nfds_t;
 
@@ -697,11 +696,11 @@ struct stPoll_t : public stTimeoutItem_t
     int iEpollFd;
 
     int iRaiseCnt;
-
-
 };
-struct stPollItem_t : public stTimeoutItem_t
+struct stPollItem_t
 {
+    ST_TIMEOUT_ITEM_COMMON;
+
     struct pollfd *pSelf;
     stPoll_t *pPoll;
 
@@ -784,10 +783,11 @@ void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemL
     {
         pPoll->iAllEventDetach = 1;
 
-        RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( pPoll );
-
-        AddTail( active,pPoll );
-
+        //RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( pPoll );
+        //AddTail(active, pPoll);
+        dq_rem(&pPoll->entry, pPoll->pLink);
+        pPoll->pLink = active;
+        dq_addlast(&pPoll->entry, pPoll->pLink);
     }
 }
 
@@ -819,7 +819,9 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
             }
             else
             {
-                AddTail( active,item );
+                //AddTail( active,item );
+                item->pLink = active;
+                dq_addlast(&item->entry, active);
             }
         }
 
@@ -827,28 +829,30 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
         unsigned long long now = GetTickMS();
         TakeAllTimeout( ctx->pTimeout,now,timeout );
 
-        stTimeoutItem_t *lp = timeout->head;
+        stTimeoutItem_t *lp = (stTimeoutItem_t *)timeout->head;
         while( lp )
         {
             //printf("raise timeout %p\n",lp);
             lp->bTimeout = true;
-            lp = lp->pNext;
+            lp = (stTimeoutItem_t *)lp->entry.flink;
         }
 
-        Join<stTimeoutItem_t,stTimeoutItemLink_t>( active,timeout );
+        dq_cat(timeout, active);
+        //Join<stTimeoutItem_t,stTimeoutItemLink_t>( active,timeout );
 
-        lp = active->head;
+        lp = (stTimeoutItem_t *)active->head;
         while( lp )
         {
 
-            PopHead<stTimeoutItem_t,stTimeoutItemLink_t>( active );
+            //PopHead<stTimeoutItem_t,stTimeoutItemLink_t>( active );
+            dq_remfirst(active);
             if (lp->bTimeout && now < lp->ullExpireTime) 
             {
                 int ret = AddTimeout(ctx->pTimeout, lp, now);
                 if (!ret) 
                 {
                     lp->bTimeout = false;
-                    lp = active->head;
+                    lp = (stTimeoutItem_t *)active->head;
                     continue;
                 }
             }
@@ -857,7 +861,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
                 lp->pfnProcess( lp );
             }
 
-            lp = active->head;
+            lp = (stTimeoutItem_t *)active->head;
         }
         if( pfn )
         {
@@ -986,7 +990,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
     unsigned long long now = GetTickMS();
     arg.ullExpireTime = now + timeout;
-    int ret = AddTimeout( ctx->pTimeout,&arg,now );
+    int ret = AddTimeout(ctx->pTimeout, (stTimeoutItem_t *)&arg, now);
     int iRaiseCnt = 0;
     if( ret != 0 )
     {
@@ -1004,7 +1008,8 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
     {
         //clear epoll status and memory
-        RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+        //RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+        dq_rem(&arg.entry, arg.pLink);
         for(nfds_t i = 0;i < nfds;i++)
         {
             int fd = fds[i].fd;
@@ -1097,21 +1102,13 @@ stCoRoutine_t *co_self()
     return GetCurrThreadCo();
 }
 
-//co cond
-struct stCoCond_t;
 struct stCoCondItem_t 
 {
-    stCoCondItem_t *pPrev;
-    stCoCondItem_t *pNext;
+    struct dq_entry_s entry;
     stCoCond_t *pLink;
-
     stTimeoutItem_t timeout;
 };
-struct stCoCond_t
-{
-    stCoCondItem_t *head;
-    stCoCondItem_t *tail;
-};
+
 static void OnSignalProcessEvent( stTimeoutItem_t * ap )
 {
     stCoRoutine_t *co = (stCoRoutine_t*)ap->pArg;
@@ -1119,36 +1116,40 @@ static void OnSignalProcessEvent( stTimeoutItem_t * ap )
 }
 
 stCoCondItem_t *co_cond_pop( stCoCond_t *link );
-int co_cond_signal( stCoCond_t *si )
+int co_cond_signal( stCoCond_t *list )
 {
-    stCoCondItem_t * sp = co_cond_pop( si );
-    if( !sp ) 
-    {
+    stCoCondItem_t *sp = (stCoCondItem_t *)dq_remlast(list);
+    if (!sp) {
         return 0;
     }
-    RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &sp->timeout );
+    //RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &sp->timeout );
+    dq_rem(&sp->timeout.entry, sp->timeout.pLink);
 
-    AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );
+    //AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );
+    sp->pLink = co_get_curr_thread_env()->pEpoll->pstActiveList;
+    dq_addlast(&sp->timeout.entry, sp->pLink);
 
     return 0;
 }
-int co_cond_broadcast( stCoCond_t *si )
+int co_cond_broadcast( stCoCond_t *list )
 {
-    for(;;)
-    {
-        stCoCondItem_t * sp = co_cond_pop( si );
-        if( !sp ) return 0;
+    for (;;) {
+        stCoCondItem_t *sp = (stCoCondItem_t *)dq_remlast(list);
+        if (!sp)
+            return 0;
 
-        RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &sp->timeout );
+        //RemoveFromLink<stTimeoutItem_t, stTimeoutItemLink_t>(&sp->timeout);
+        dq_rem(&sp->timeout.entry, sp->timeout.pLink);
 
-        AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );
+        //AddTail(co_get_curr_thread_env()->pEpoll->pstActiveList, &sp->timeout);
+        sp->pLink = co_get_curr_thread_env()->pEpoll->pstActiveList;
+        dq_addlast(&sp->timeout.entry, sp->pLink);
     }
 
     return 0;
 }
 
-
-int co_cond_timedwait( stCoCond_t *link,int ms )
+int co_cond_timedwait( dq_queue_t *link, int ms )
 {
     stCoCondItem_t* psi = (stCoCondItem_t*)calloc(1, sizeof(stCoCondItem_t));
     psi->timeout.pArg = GetCurrThreadCo();
@@ -1166,12 +1167,15 @@ int co_cond_timedwait( stCoCond_t *link,int ms )
             return ret;
         }
     }
-    AddTail( link, psi);
+    //AddTail( link, psi);
+    psi->pLink = link;
+    dq_addlast(&psi->entry, psi->pLink);
 
     co_yield_ct();
 
 
-    RemoveFromLink<stCoCondItem_t,stCoCond_t>( psi );
+    // RemoveFromLink<stCoCondItem_t,stCoCond_t>( psi );
+    dq_rem(&psi->entry, link);
     free(psi);
 
     return 0;
@@ -1189,10 +1193,5 @@ int co_cond_free( stCoCond_t * cc )
 
 stCoCondItem_t *co_cond_pop( stCoCond_t *link )
 {
-    stCoCondItem_t *p = link->head;
-    if( p )
-    {
-        PopHead<stCoCondItem_t,stCoCond_t>( link );
-    }
-    return p;
+    return (stCoCondItem_t *)dq_remlast(link);
 }

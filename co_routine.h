@@ -73,7 +73,7 @@ void 	co_disable_hook_sys();
 bool 	co_is_enable_sys_hook();
 
 //6.sync
-struct stCoCond_t;
+typedef struct dq_queue_s stCoCond_t;
 
 stCoCond_t *co_cond_alloc();
 int co_cond_free( stCoCond_t * cc );
