@@ -52,13 +52,15 @@ else
 LINKS += -L$(STATICLIBPATH)
 endif
 
-CPPSRCS  = $(wildcard *.cpp)
-CSRCS  = $(wildcard *.c)
-CPPOBJS  = $(patsubst %.cpp,%.o,$(CPPSRCS))
-COBJS  = $(patsubst %.c,%.o,$(CSRCS))
 
-SRCS = $(CPPSRCS) $(CSRCS)
-OBJS = $(CPPOBJS) $(COBJS)
+#CPPSRCS  = $(wildcard *.cpp)
+#CSRCS  = $(wildcard *.c)
+#CPPOBJS  = $(patsubst %.cpp,%.o,$(CPPSRCS))
+#COBJS  = $(patsubst %.c,%.o,$(CSRCS))
+#
+#SRCS = $(CPPSRCS) $(CSRCS)
+#OBJS = $(CPPOBJS) $(COBJS)
+
 
 CPPCOMPI=$(CPP) $(CFLAGS) -Wno-deprecated
 CCCOMPI=$(CC) $(CFLAGS)

@@ -162,6 +162,7 @@ struct stCoEpoll_t
     int iEpollFd;
     static const int _EPOLL_SIZE = 1024 * 10;
 
+    // 作用是啥？
     struct stTimeout_t *pTimeout;
 
     // 仅在epoll_wait的时候，作为临时变量使用
@@ -195,6 +196,7 @@ struct stTimeoutItem_t
 
 struct stTimeout_t
 {
+    // for stTimeoutItem_t
     dq_queue_s *pItems;
     int iItemSize;
 
@@ -964,7 +966,8 @@ int co_cond_signal( stCoCond_t *list )
         return 0;
     }
 
-    dq_rem(&sp->timeout.entry, sp->timeout.pLink);
+    if (sp->timeout.pLink)
+        dq_rem(&sp->timeout.entry, sp->timeout.pLink);
 
     sp->pLink = co_get_curr_thread_env()->pEpoll->pstActiveList;
     dq_addlast(&sp->timeout.entry, sp->pLink);

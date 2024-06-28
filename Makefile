@@ -35,12 +35,31 @@ else
 LINKS += -g -L./lib -lcolib -lpthread -ldl
 endif
 
-COLIB_OBJS=co_epoll.o co_routine.o co_hook_sys_call.o coctx_swap.o coctx.o co_comm.o
-#co_swapcontext.o
-
 PROGS = colib example_poll example_echosvr example_echocli example_thread  example_cond example_specific example_copystack example_closure example_setenv
 
 all:$(PROGS)
+
+
+co_epoll.o: co_epoll.cpp co_epoll.h
+	$(CPPCOMPILE)
+
+co_routine.o: co_routine.cpp co_routine.h co_routine_inner.h co_epoll.h
+	$(CPPCOMPILE)
+
+co_hook_sys_call.o: co_hook_sys_call.cpp
+	$(CPPCOMPILE)
+
+coctx_swap.o: coctx_swap.S
+	$(CPPCOMPILE)
+
+coctx.o: coctx.cpp
+	$(CPPCOMPILE)
+
+co_comm.o: co_comm.cpp co_comm.h
+	$(CPPCOMPILE)
+
+COLIB_OBJS=co_epoll.o co_routine.o co_hook_sys_call.o coctx_swap.o coctx.o co_comm.o
+#co_swapcontext.o
 
 colib:libcolib.a #libcolib.so
 
@@ -49,25 +68,25 @@ libcolib.a: $(COLIB_OBJS)
 libcolib.so: $(COLIB_OBJS)
 	$(BUILDSHARELIB) 
 
-example_echosvr:example_echosvr.o
+example_echosvr:example_echosvr.o $(COLIB_OBJS)
 	$(BUILDEXE) 
-example_echocli:example_echocli.o
+example_echocli:example_echocli.o $(COLIB_OBJS)
 	$(BUILDEXE) 
-example_thread:example_thread.o
+example_thread:example_thread.o $(COLIB_OBJS)
 	$(BUILDEXE) 
-example_poll:example_poll.o
+example_poll:example_poll.o $(COLIB_OBJS)
 	$(BUILDEXE) 
-example_exit:example_exit.o
+example_exit:example_exit.o $(COLIB_OBJS)
 	$(BUILDEXE) 
-example_cond:example_cond.o
+example_cond:example_cond.o $(COLIB_OBJS)
 	$(BUILDEXE)
-example_specific:example_specific.o
+example_specific:example_specific.o $(COLIB_OBJS)
 	$(BUILDEXE)
-example_copystack:example_copystack.o
+example_copystack:example_copystack.o $(COLIB_OBJS)
 	$(BUILDEXE)
-example_setenv:example_setenv.o
+example_setenv:example_setenv.o $(COLIB_OBJS)
 	$(BUILDEXE)
-example_closure:example_closure.o
+example_closure:example_closure.o $(COLIB_OBJS)
 	$(BUILDEXE)
 
 dist: clean libco-$(version).src.tar.gz

@@ -167,7 +167,6 @@ static void SetAddr(const char *pszIP,const unsigned short shPort,struct sockadd
 		nIP = inet_addr(pszIP);
 	}
 	addr.sin_addr.s_addr = nIP;
-
 }
 
 static int CreateTcpSocket(const unsigned short shPort /* = 0 */,const char *pszIP /* = "*" */,bool bReuse /* = false */)
@@ -198,16 +197,24 @@ static int CreateTcpSocket(const unsigned short shPort /* = 0 */,const char *psz
 
 int main(int argc,char *argv[])
 {
+#if 0
 	if(argc<5){
 		printf("Usage:\n"
                "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT]\n"
                "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT] -d   # daemonize mode\n");
 		return -1;
 	}
+
 	const char *ip = argv[1];
 	int port = atoi( argv[2] );
 	int cnt = atoi( argv[3] );
 	int proccnt = atoi( argv[4] );
+#else
+	const char *ip = "127.0.0.1";
+	int port = 8080;
+	int cnt = 1;
+	int proccnt = 1;
+#endif
 	bool deamonize = argc >= 6 && strcmp(argv[5], "-d") == 0;
 
 	g_listen_fd = CreateTcpSocket( port,ip,true );
@@ -222,7 +229,7 @@ int main(int argc,char *argv[])
 
 	for(int k=0;k<proccnt;k++)
 	{
-
+#if 0
 		pid_t pid = fork();
 		if( pid > 0 )
 		{
@@ -232,6 +239,7 @@ int main(int argc,char *argv[])
 		{
 			break;
 		}
+#endif
 		for(int i=0;i<cnt;i++)
 		{
 			task_t * task = (task_t*)calloc( 1,sizeof(task_t) );

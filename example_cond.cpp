@@ -19,17 +19,17 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <queue>
+#include "queue.h"
 #include "co_routine.h"
 using namespace std;
-struct stTask_t
-{
+struct stTask_t {
+    dq_entry_s entry;
     int id;
 };
 struct stEnv_t
 {
     stCoCond_t* cond;
-    queue<stTask_t*> task_queue;
+    dq_queue_t task_queue;
 };
 void* Producer(void* args)
 {
@@ -40,7 +40,7 @@ void* Producer(void* args)
     {
         stTask_t* task = (stTask_t*)calloc(1, sizeof(stTask_t));
         task->id = id++;
-        env->task_queue.push(task);
+        dq_addlast(&task->entry, &env->task_queue);
         printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
         co_cond_signal(env->cond);
         poll(NULL, 0, 1000);
@@ -53,13 +53,12 @@ void* Consumer(void* args)
     stEnv_t* env = (stEnv_t*)args;
     while (true)
     {
-        if (env->task_queue.empty())
+        if (dq_empty(&env->task_queue))
         {
             co_cond_timedwait(env->cond, -1);
             continue;
         }
-        stTask_t* task = env->task_queue.front();
-        env->task_queue.pop();
+        stTask_t* task = (stTask_t*)dq_remfirst(&env->task_queue);
         printf("%s:%d consume task %d\n", __func__, __LINE__, task->id);
         free(task);
     }
@@ -67,7 +66,9 @@ void* Consumer(void* args)
 }
 int main()
 {
-    stEnv_t* env = new stEnv_t;
+    stEnv_t* env = (stEnv_t *)calloc(1, sizeof(stEnv_t));
+    dq_init(&env->task_queue);
+    
     env->cond = co_cond_alloc();
 
     stCoRoutine_t* consumer_routine;

@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             //"program": "${workspaceFolder}/example_thread",
-            "program": "${workspaceFolder}/example_cond",
+            "program": "${workspaceFolder}/example_echosvr",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

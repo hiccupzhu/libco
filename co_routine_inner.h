@@ -45,7 +45,6 @@ struct stShareStack_t
 };
 
 
-
 struct stCoRoutine_t
 {
 	stCoRoutineEnv_t *env;
