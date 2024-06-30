@@ -42,3 +42,6 @@ example_poll
 example_setenv
 example_specific
 example_thread
+
+.msvc/
+

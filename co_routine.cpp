@@ -41,7 +41,8 @@
 
 extern "C"
 {
-    extern void coctx_swap( coctx_t *,coctx_t* ) asm("coctx_swap");
+    // 将当前的上下文保存到from中，将to的上下文切换到当前上下文
+    extern void coctx_swap( coctx_t *from, coctx_t* to) asm("coctx_swap");
 };
 
 stCoRoutine_t *GetCurrCo( stCoRoutineEnv_t *env );

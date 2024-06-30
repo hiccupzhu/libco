@@ -20,27 +20,28 @@
 #if !defined( __APPLE__ )
 .type  coctx_swap, @function
 #endif
+# coctx_swap(coctx_t *from, coctx_t *to)
 coctx_swap:
 
 #if defined(__i386__)
-    movl 4(%esp), %eax
-    movl %esp,  28(%eax)
-    movl %ebp, 24(%eax)
-    movl %esi, 20(%eax)
-    movl %edi, 16(%eax)
-    movl %edx, 12(%eax)
-    movl %ecx, 8(%eax)
-    movl %ebx, 4(%eax)
+    movl 4(%esp), %eax    # eax = from
+    movl %esp,  28(%eax)  # from->regs[6] = esp
+    movl %ebp, 24(%eax)   # from->regs[5] = ebp
+    movl %esi, 20(%eax)   # from->regs[4] = esi
+    movl %edi, 16(%eax)   # from->regs[3] = edi
+    movl %edx, 12(%eax)   # from->regs[2] = edx
+    movl %ecx, 8(%eax)    # from->regs[1] = ecx
+    movl %ebx, 4(%eax)    # from->regs[0] = ebx
 
 
-    movl 8(%esp), %eax
-    movl 4(%eax), %ebx
-    movl 8(%eax), %ecx
-    movl 12(%eax), %edx
-    movl 16(%eax), %edi
-    movl 20(%eax), %esi
-    movl 24(%eax), %ebp
-    movl 28(%eax), %esp
+    movl 8(%esp), %eax    # eax = to
+    movl 4(%eax), %ebx    # ebx = to->regs[0]
+    movl 8(%eax), %ecx    # ecx = to->regs[1]
+    movl 12(%eax), %edx   # edx = to->regs[2]
+    movl 16(%eax), %edi   # edi = to->regs[3]
+    movl 20(%eax), %esi   # esi = to->regs[4]
+    movl 24(%eax), %ebp   # ebp = to->regs[5]
+    movl 28(%eax), %esp   # esp = to->regs[6]
 
 	ret
 
