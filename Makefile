@@ -25,14 +25,14 @@ include co.mk
 
 ########## options ##########
 CFLAGS += -g -fno-strict-aliasing -O0 -Wall -export-dynamic \
-	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
+	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m32
 
 UNAME := $(shell uname -s)
 
 ifeq ($(UNAME), FreeBSD)
-LINKS += -g -L./lib -lcolib -lpthread
+LINKS += -g -L./lib -lcolib -lpthread -m32
 else
-LINKS += -g -L./lib -lcolib -lpthread -ldl
+LINKS += -g -L./lib -lcolib -lpthread -ldl -m32
 endif
 
 PROGS = colib example_poll example_echosvr example_echocli example_thread  example_cond example_specific example_copystack example_closure example_setenv

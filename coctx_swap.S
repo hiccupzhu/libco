@@ -25,23 +25,23 @@ coctx_swap:
 
 #if defined(__i386__)
     movl 4(%esp), %eax    # eax = from
-    movl %esp,  28(%eax)  # from->regs[6] = esp
-    movl %ebp, 24(%eax)   # from->regs[5] = ebp
-    movl %esi, 20(%eax)   # from->regs[4] = esi
-    movl %edi, 16(%eax)   # from->regs[3] = edi
-    movl %edx, 12(%eax)   # from->regs[2] = edx
-    movl %ecx, 8(%eax)    # from->regs[1] = ecx
-    movl %ebx, 4(%eax)    # from->regs[0] = ebx
+    movl %esp,  28(%eax)  # from->regs[7] = esp
+    movl %ebp, 24(%eax)   # from->regs[6] = ebp
+    movl %esi, 20(%eax)   # from->regs[5] = esi
+    movl %edi, 16(%eax)   # from->regs[4] = edi
+    movl %edx, 12(%eax)   # from->regs[3] = edx
+    movl %ecx, 8(%eax)    # from->regs[2] = ecx
+    movl %ebx, 4(%eax)    # from->regs[1] = ebx
 
 
     movl 8(%esp), %eax    # eax = to
-    movl 4(%eax), %ebx    # ebx = to->regs[0]
-    movl 8(%eax), %ecx    # ecx = to->regs[1]
-    movl 12(%eax), %edx   # edx = to->regs[2]
-    movl 16(%eax), %edi   # edi = to->regs[3]
-    movl 20(%eax), %esi   # esi = to->regs[4]
-    movl 24(%eax), %ebp   # ebp = to->regs[5]
-    movl 28(%eax), %esp   # esp = to->regs[6]
+    movl 4(%eax), %ebx    # ebx = to->regs[1]
+    movl 8(%eax), %ecx    # ecx = to->regs[2]
+    movl 12(%eax), %edx   # edx = to->regs[3]
+    movl 16(%eax), %edi   # edi = to->regs[4]
+    movl 20(%eax), %esi   # esi = to->regs[5]
+    movl 24(%eax), %ebp   # ebp = to->regs[6]
+    movl 28(%eax), %esp   # esp = to->regs[7]
 
 	ret
 

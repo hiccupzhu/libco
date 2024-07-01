@@ -90,6 +90,13 @@ int coctx_init(coctx_t* ctx) {
   memset(ctx, 0, sizeof(*ctx));
   return 0;
 }
+/*
+* 准备协程栈区，S和S1是传递给协程的两个参数，最后的形态如下
+* 0xFFFFFFF0 s
+* 0xFFFFFFEC s1
+* 0xFFFFFFE8 ret_addr
+* 0xFFFFFFE4 0  #ebp
+*/ 
 int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
   // make room for coctx_param
   char* sp = ctx->ss_sp + ctx->ss_size - sizeof(coctx_param_t);

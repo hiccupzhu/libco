@@ -18,5 +18,6 @@
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
         "**/*.o": true,
-    }
+    },
+
 }
