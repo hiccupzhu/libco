@@ -40,25 +40,25 @@ PROGS = colib example_poll example_echosvr example_echocli example_thread  examp
 all:$(PROGS)
 
 
-co_epoll.o: co_epoll.cpp co_epoll.h
+co_epoll.o: co_epoll.c co_epoll.h
 	$(CPPCOMPILE)
 
-co_routine.o: co_routine.cpp co_routine.h co_routine_inner.h co_epoll.h
+co_routine.o: co_routine.c co_routine.h co_routine_inner.h co_epoll.h
 	$(CPPCOMPILE)
 
-co_hook_sys_call.o: co_hook_sys_call.cpp
+co_hook_sys_call.o: co_hook_sys_call.c
 	$(CPPCOMPILE)
 
 coctx_swap.o: coctx_swap.S
 	$(CPPCOMPILE)
 
-coctx.o: coctx.cpp
+coctx.o: coctx.c
 	$(CPPCOMPILE)
 
-co_comm.o: co_comm.cpp co_comm.h co_routine.h
-	$(CPPCOMPILE)
+#co_comm.o: co_comm.cpp co_comm.h co_routine.h
+#	$(CPPCOMPILE)
 
-COLIB_OBJS=co_epoll.o co_routine.o co_hook_sys_call.o coctx_swap.o coctx.o co_comm.o
+COLIB_OBJS=co_epoll.o co_routine.o co_hook_sys_call.o coctx_swap.o coctx.o #co_comm.o
 #co_swapcontext.o
 
 colib:libcolib.a #libcolib.so

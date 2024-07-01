@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include "queue.h"
 #include "co_routine.h"
-using namespace std;
+
 struct stTask_t {
     dq_entry_s entry;
     int id;

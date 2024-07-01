@@ -21,31 +21,34 @@
 
 #include "co_routine.h"
 #include "coctx.h"
-struct stCoRoutineEnv_t;
-struct stCoSpec_t
+
+__BEGIN_DECLS
+
+typedef struct stCoRoutineEnv_t stCoRoutineEnv_t;
+typedef struct stCoSpec_t
 {
 	void *value;
-};
+} stCoSpec_t;
 
-struct stStackMem_t
+typedef struct stStackMem_t
 {
 	stCoRoutine_t* occupy_co;
 	int stack_size;
 	char* stack_bp; //stack_buffer + stack_size
 	char* stack_buffer;
 
-};
+} stStackMem_t;
 
-struct stShareStack_t
+typedef struct stShareStack_t
 {
 	unsigned int alloc_idx;
 	int stack_size;
 	int count;
 	stStackMem_t** stack_array;
-};
+} stShareStack_t;
 
 
-struct stCoRoutine_t
+typedef struct stCoRoutine_t
 {
 	stCoRoutineEnv_t *env;
 	pfn_co_routine_t pfn;
@@ -70,7 +73,7 @@ struct stCoRoutine_t
 	char* save_buffer;
 
 	stCoSpec_t aSpec[1024];
-};
+} stCoRoutine_t;
 
 
 
@@ -88,8 +91,8 @@ void    co_yield_env(  stCoRoutineEnv_t *env );
 
 //-----------------------------------------------------------------------------------------------
 
-struct stTimeout_t;
-struct stTimeoutItem_t ;
+typedef struct stTimeout_t stTimeout_t;
+typedef struct stTimeoutItem_t stTimeoutItem_t;
 
 stTimeout_t *AllocTimeout( int iSize );
 void 	FreeTimeout( stTimeout_t *apTimeout );
@@ -105,5 +108,7 @@ void 				SetEpoll( stCoRoutineEnv_t *env,stCoEpoll_t *ev );
 typedef void (*pfnCoRoutineFunc_t)();
 
 #endif
+
+__END_DECLS
 
 #define __CO_ROUTINE_INNER_H__

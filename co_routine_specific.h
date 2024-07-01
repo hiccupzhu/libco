@@ -17,6 +17,7 @@
 */
 
 #pragma once
+#if 0
 #include <pthread.h>
 #include <stdlib.h>
 
@@ -83,4 +84,4 @@ public:\
 };\
 \
 static clsRoutineData_routine_##name<name> y;
-
+#endif

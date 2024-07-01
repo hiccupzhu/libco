@@ -23,20 +23,23 @@
 #include <sys/poll.h>
 #include <pthread.h>
 
+__BEGIN_DECLS
 //1.struct
 
-struct stCoRoutine_t;
-struct stShareStack_t;
+typedef struct stCoRoutine_t stCoRoutine_t;
+typedef struct stShareStack_t stShareStack_t;
+typedef struct stCoEpoll_t stCoEpoll_t;
 
-struct stCoRoutineAttr_t
+typedef struct stCoRoutineAttr_t
 {
     int stack_size;
     stShareStack_t*  share_stack;
-}__attribute__ ((packed));
+}__attribute__ ((packed)) stCoRoutineAttr_t;
 
 struct stCoEpoll_t;
 typedef int (*pfn_co_eventloop_t)(void *);
 typedef void *(*pfn_co_routine_t)( void * );
+
 
 //2.co_routine
 int     co_create( stCoRoutine_t **co,const stCoRoutineAttr_t *attr,void *(*routine)(void*),void *arg );
@@ -83,5 +86,7 @@ stShareStack_t* co_alloc_sharestack(int iCount, int iStackSize);
 void co_set_env_list( const char *name[],size_t cnt);
 
 void co_log_err( const char *fmt,... );
+
+__END_DECLS
 #endif
 

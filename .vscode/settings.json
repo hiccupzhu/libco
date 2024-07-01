@@ -8,7 +8,8 @@
         "cmath": "cpp",
         "limits": "cpp",
         "new": "cpp",
-        "type_traits": "cpp"
+        "type_traits": "cpp",
+        "coctx.h": "c"
     },
     "files.exclude": {
         "**/.git": true,

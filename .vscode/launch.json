@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             //"program": "${workspaceFolder}/example_thread",
-            "program": "${workspaceFolder}/example_copystack",
+            "program": "${workspaceFolder}/example_specific",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
