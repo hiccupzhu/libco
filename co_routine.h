@@ -67,7 +67,7 @@ stCoEpoll_t *     co_get_epoll_ct(); //ct = current thread
 
 void     co_enable_hook_sys();  
 void     co_disable_hook_sys();  
-bool     co_is_enable_sys_hook();
+int      co_is_enable_sys_hook();
 
 //6.sync
 typedef struct dq_queue_s stCoCond_t;

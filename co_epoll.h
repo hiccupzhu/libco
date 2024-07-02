@@ -30,12 +30,12 @@
 
 #include <sys/epoll.h>
 
-struct co_epoll_res
+typedef struct co_epoll_res
 {
 	int size;
 	struct epoll_event *events;
 	struct kevent *eventlist;
-};
+} co_epoll_res;
 
 __BEGIN_DECLS
 

@@ -41,14 +41,14 @@
 #include <netdb.h>
 
 #include <time.h>
-#include <map>
+#include "rbtree.h"
 #include "co_routine.h"
 #include "co_routine_inner.h"
 #include "co_routine_specific.h"
 
 typedef long long ll64_t;
 
-struct rpchook_t
+typedef struct rpchook_t
 {
     int user_flag;
     struct sockaddr_in dest; //maybe sockaddr_un;
@@ -56,7 +56,8 @@ struct rpchook_t
 
     struct timeval read_timeout;
     struct timeval write_timeout;
-};
+}rpchook_t;
+
 static inline pid_t GetPid()
 {
     char **p = (char**)pthread_self();
@@ -95,40 +96,72 @@ typedef int (*pthread_setspecific_pfn_t)(pthread_key_t key, const void *value);
 typedef int (*setenv_pfn_t)(const char *name, const char *value, int overwrite);
 typedef int (*unsetenv_pfn_t)(const char *name);
 typedef char *(*getenv_pfn_t)(const char *name);
-typedef hostent* (*gethostbyname_pfn_t)(const char *name);
+typedef struct hostent* (*gethostbyname_pfn_t)(const char *name);
 typedef res_state (*__res_state_pfn_t)();
 typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 typedef int (*gethostbyname_r_pfn_t)(const char* __restrict name, struct hostent* __restrict __result_buf, char* __restrict __buf, size_t __buflen, struct hostent** __restrict __result, int* __restrict __h_errnop);
 
-static socket_pfn_t g_sys_socket_func     = (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
-static connect_pfn_t g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
-static close_pfn_t g_sys_close_func     = (close_pfn_t)dlsym(RTLD_NEXT,"close");
+static socket_pfn_t g_sys_socket_func     = NULL;
+static connect_pfn_t g_sys_connect_func = NULL;
+static close_pfn_t g_sys_close_func     = NULL;
 
-static read_pfn_t g_sys_read_func         = (read_pfn_t)dlsym(RTLD_NEXT,"read");
-static write_pfn_t g_sys_write_func     = (write_pfn_t)dlsym(RTLD_NEXT,"write");
+static read_pfn_t g_sys_read_func         = NULL;
+static write_pfn_t g_sys_write_func     = NULL;
 
-static sendto_pfn_t g_sys_sendto_func     = (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
-static recvfrom_pfn_t g_sys_recvfrom_func = (recvfrom_pfn_t)dlsym(RTLD_NEXT,"recvfrom");
+static sendto_pfn_t g_sys_sendto_func     = NULL;
+static recvfrom_pfn_t g_sys_recvfrom_func = NULL;
 
-static send_pfn_t g_sys_send_func         = (send_pfn_t)dlsym(RTLD_NEXT,"send");
-static recv_pfn_t g_sys_recv_func         = (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
+static send_pfn_t g_sys_send_func         = NULL;
+static recv_pfn_t g_sys_recv_func         = NULL;
 
-static poll_pfn_t g_sys_poll_func         = (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
+static poll_pfn_t g_sys_poll_func         = NULL;
 
 static setsockopt_pfn_t g_sys_setsockopt_func 
-                                        = (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
-static fcntl_pfn_t g_sys_fcntl_func     = (fcntl_pfn_t)dlsym(RTLD_NEXT,"fcntl");
+                                        = NULL;
+static fcntl_pfn_t g_sys_fcntl_func     = NULL;
 
-static setenv_pfn_t g_sys_setenv_func   = (setenv_pfn_t)dlsym(RTLD_NEXT,"setenv");
-static unsetenv_pfn_t g_sys_unsetenv_func = (unsetenv_pfn_t)dlsym(RTLD_NEXT,"unsetenv");
-static getenv_pfn_t g_sys_getenv_func   =  (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv");
-static __res_state_pfn_t g_sys___res_state_func  = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
+static setenv_pfn_t g_sys_setenv_func   = NULL;
+static unsetenv_pfn_t g_sys_unsetenv_func = NULL;
+static getenv_pfn_t g_sys_getenv_func   = NULL;
+static __res_state_pfn_t g_sys___res_state_func  = NULL;
 
-static gethostbyname_pfn_t g_sys_gethostbyname_func = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
-static gethostbyname_r_pfn_t g_sys_gethostbyname_r_func = (gethostbyname_r_pfn_t)dlsym(RTLD_NEXT, "gethostbyname_r");
+static gethostbyname_pfn_t g_sys_gethostbyname_func = NULL;
+static gethostbyname_r_pfn_t g_sys_gethostbyname_r_func = NULL;
 
-static __poll_pfn_t g_sys___poll_func = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
+static __poll_pfn_t g_sys___poll_func = NULL;
 
+
+void sys_hook_call_init()
+{
+    g_sys_socket_func     = (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
+    g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
+    g_sys_close_func     = (close_pfn_t)dlsym(RTLD_NEXT,"close");
+
+    g_sys_read_func         = (read_pfn_t)dlsym(RTLD_NEXT,"read");
+    g_sys_write_func     = (write_pfn_t)dlsym(RTLD_NEXT,"write");
+
+    g_sys_sendto_func     = (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
+    g_sys_recvfrom_func = (recvfrom_pfn_t)dlsym(RTLD_NEXT,"recvfrom");
+
+    g_sys_send_func         = (send_pfn_t)dlsym(RTLD_NEXT,"send");
+    g_sys_recv_func         = (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
+
+    g_sys_poll_func         = (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
+
+    g_sys_setsockopt_func 
+                                            = (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
+    g_sys_fcntl_func     = (fcntl_pfn_t)dlsym(RTLD_NEXT,"fcntl");
+
+    g_sys_setenv_func   = (setenv_pfn_t)dlsym(RTLD_NEXT,"setenv");
+    g_sys_unsetenv_func = (unsetenv_pfn_t)dlsym(RTLD_NEXT,"unsetenv");
+    g_sys_getenv_func   =  (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv");
+    g_sys___res_state_func  = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
+
+    g_sys_gethostbyname_func = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
+    g_sys_gethostbyname_r_func = (gethostbyname_r_pfn_t)dlsym(RTLD_NEXT, "gethostbyname_r");
+
+    g_sys___poll_func = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
+}
 
 /*
 static pthread_getspecific_pfn_t g_sys_pthread_getspecific_func 
@@ -172,11 +205,11 @@ struct rpchook_connagent_head_t
 
 #define HOOK_SYS_FUNC(name) if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
-static inline ll64_t diff_ms(struct timeval &begin,struct timeval &end)
+static inline ll64_t diff_ms(struct timeval *begin,struct timeval *end)
 {
-    ll64_t u = (end.tv_sec - begin.tv_sec) ;
+    ll64_t u = (end->tv_sec - begin->tv_sec) ;
     u *= 1000 * 10;
-    u += ( end.tv_usec - begin.tv_usec ) / (  100 );
+    u += ( end->tv_usec - begin->tv_usec ) / (  100 );
     return u;
 }
 
@@ -574,6 +607,69 @@ ssize_t recv( int socket, void *buffer, size_t length, int flags )
     
 }
 
+
+struct map_i2i_node_s {
+  	struct rb_node node;
+  	int key;
+    int val;
+};
+
+struct map_i2i_node_s * map_i2i_search(struct rb_root *root, int key)
+{
+  	struct rb_node *node = root->rb_node;
+
+  	while (node) {
+  		struct map_i2i_node_s *data = container_of(node, struct map_i2i_node_s, node);
+		int result;
+
+		result = key - data->key;
+
+		if (result < 0)
+  			node = node->rb_left;
+		else if (result > 0)
+  			node = node->rb_right;
+		else
+  			return data;
+	}
+	return NULL;
+}
+
+int map_i2i_insert(struct rb_root *root, struct map_i2i_node_s *data)
+{
+  	struct rb_node **new = &(root->rb_node), *parent = NULL;
+
+  	/* Figure out where to put new node */
+  	while (*new) {
+  		struct map_i2i_node_s *this = container_of(*new, struct map_i2i_node_s, node);
+  		int result = data->key - this->key;
+
+		parent = *new;
+  		if (result < 0)
+  			new = &((*new)->rb_left);
+  		else if (result > 0)
+  			new = &((*new)->rb_right);
+  		else
+  			return 0;
+  	}
+
+  	/* Add new node and rebalance tree. */
+  	rb_link_node(&data->node, parent, new);
+  	rb_insert_color(&data->node, root);
+
+	return 1;
+}
+
+void map_i2i_free(struct rb_root *root)
+{
+    struct rb_node *node = rb_first(root);
+    while (node) {
+        struct map_i2i_node_s *data = container_of(node, struct map_i2i_node_s, node);
+        node = rb_next(node);
+        rb_erase(&data->node, root);
+        free(data);
+    }
+}
+
 extern int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout, poll_pfn_t pollfunc);
 
 int poll(struct pollfd fds[], nfds_t nfds, int timeout)
@@ -583,19 +679,26 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
     if (!co_is_enable_sys_hook() || timeout == 0) {
         return g_sys_poll_func(fds, nfds, timeout);
     }
-    pollfd *fds_merge = NULL;
+    struct pollfd *fds_merge = NULL;
     nfds_t nfds_merge = 0;
-    std::map<int, int> m;  // fd --> idx
-    std::map<int, int>::iterator it;
+    struct rb_root m = RB_ROOT;
+    struct map_i2i_node_s *it;
+    //std::map<int, int> m;  // fd --> idx
+    //std::map<int, int>::iterator it;
     if (nfds > 1) {
-        fds_merge = (pollfd *)malloc(sizeof(pollfd) * nfds);
+        fds_merge = (struct pollfd *)malloc(sizeof(struct pollfd) * nfds);
         for (size_t i = 0; i < nfds; i++) {
-            if ((it = m.find(fds[i].fd)) == m.end()) {
+            it = map_i2i_search(&m, fds[i].fd);
+            if (it == NULL) {
                 fds_merge[nfds_merge] = fds[i];
-                m[fds[i].fd] = nfds_merge;
+                struct map_i2i_node_s *node = (struct map_i2i_node_s *)malloc(sizeof(struct map_i2i_node_s));
+                node->key = fds[i].fd;
+                node->val = nfds_merge;
+                map_i2i_insert(&m, node);
+                //m[fds[i].fd] = nfds_merge;
                 nfds_merge++;
             } else {
-                int j = it->second;
+                int j = it->val;
                 fds_merge[j].events |= fds[i].events;  // merge in j slot
             }
         }
@@ -609,18 +712,19 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
                 g_sys_poll_func);
         if (ret > 0) {
             for (size_t i = 0; i < nfds; i++) {
-                it = m.find(fds[i].fd);
-                if (it != m.end()) {
-                    int j = it->second;
+                it = map_i2i_search(&m, fds[i].fd);
+                //it = m.find(fds[i].fd);
+                if (it) {
+                    int j = it->val;
                     fds[i].revents = fds_merge[j].revents & fds[i].events;
                 }
             }
         }
     }
     free(fds_merge);
+    map_i2i_free(&m);
+
     return ret;
-
-
 }
 int setsockopt(int fd, int level, int option_name,
                              const void *option_value, socklen_t option_len)
@@ -741,16 +845,16 @@ int fcntl(int fildes, int cmd, ...)
     return ret;
 }
 
-struct stCoSysEnv_t
+typedef struct stCoSysEnv_t
 {
     char *name;    
     char *value;
-};
-struct stCoSysEnvArr_t
+} stCoSysEnv_t;
+typedef struct stCoSysEnvArr_t
 {
     stCoSysEnv_t *data;
     size_t cnt;
-};
+} stCoSysEnvArr_t;
 static stCoSysEnvArr_t *dup_co_sysenv_arr( stCoSysEnvArr_t * arr )
 {
     stCoSysEnvArr_t *lp = (stCoSysEnvArr_t*)calloc( sizeof(stCoSysEnvArr_t),1 );    
@@ -831,14 +935,14 @@ int setenv(const char *n, const char *value, int overwrite)
                 if( overwrite || !e->value  )
                 {
                     if( e->value ) free( e->value );
-                    e->value = ( value ? strdup( value ) : 0 );
+                    e->value = value ? strdup( value ) : NULL;
                 }
                 return 0;
             }
         }
 
     }
-    return g_sys_setenv_func( n,value,overwrite );
+    return g_sys_setenv_func( n, value, overwrite );
 }
 int unsetenv(const char *n)
 {
@@ -970,59 +1074,57 @@ struct res_state_wrap
 static pthread_key_t _routine_key_res_state_wrap;
 static pthread_once_t _routine_once_res_state_wrap = PTHREAD_ONCE_INIT;
 static void _routine_make_key_res_state_wrap() {
-    (void) pthread_key_create(&_routine_key_res_state_wrap, __null);
+    (void) pthread_key_create(&_routine_key_res_state_wrap, NULL);
 }
 static res_state get_res_state(pthread_once_t *routine_once, void (*__init_routine)(), pthread_key_t *routine_key)
 {
 	if( !(*routine_once) ) {
 		pthread_once( routine_once, __init_routine);
 	}
-	res_state_wrap* p = (res_state_wrap*)co_getspecific( *routine_key );
+	struct res_state_wrap* p = (struct res_state_wrap*)co_getspecific( *routine_key );
 	if( !p ) {
-		p = (res_state_wrap*)calloc(1,sizeof(res_state_wrap));
+		p = (struct res_state_wrap*)calloc(1,sizeof(struct res_state_wrap));
 		int ret = co_setspecific( *routine_key, p) ;
 		if ( ret ) {
 			if ( p ) {
 				free(p);
-				p = __null;
+				p = NULL;
 			}
 		}
 	}
 	return &p->state;
 }
 
-extern "C"
+res_state __res_state() 
 {
-    res_state __res_state() 
-    {
-        HOOK_SYS_FUNC(__res_state);
+    HOOK_SYS_FUNC(__res_state);
 
-        if (!co_is_enable_sys_hook()) 
-        {
-            return g_sys___res_state_func();
-        }
-
-        return get_res_state(&_routine_once_res_state_wrap, _routine_make_key_res_state_wrap, &_routine_key_res_state_wrap);
-    }
-    int __poll(struct pollfd fds[], nfds_t nfds, int timeout)
+    if (!co_is_enable_sys_hook()) 
     {
-        return poll(fds, nfds, timeout);
+        return g_sys___res_state_func();
     }
+
+    return get_res_state(&_routine_once_res_state_wrap, _routine_make_key_res_state_wrap, &_routine_key_res_state_wrap);
 }
 
-struct hostbuf_wrap 
+int __poll(struct pollfd fds[], nfds_t nfds, int timeout)
+{
+    return poll(fds, nfds, timeout);
+}
+
+typedef struct hostbuf_wrap 
 {
     struct hostent host;
     char* buffer;
     size_t iBufferSize;
     int host_errno;
-};
+} hostbuf_wrap;
 
 //CO_ROUTINE_SPECIFIC(hostbuf_wrap, __co_hostbuf_wrap);
 static pthread_key_t _routine_key_hostbuf_wrap;
 static pthread_once_t _routine_once_hostbuf_wrap = PTHREAD_ONCE_INIT;
 static void _routine_make_key_hostbuf_wrap() {
-	(void) pthread_key_create(&_routine_key_hostbuf_wrap, __null);
+	(void) pthread_key_create(&_routine_key_hostbuf_wrap, NULL);
 }
 
 static hostbuf_wrap *get_hostbuf(pthread_once_t *routine_once, void (*__init_routine)(), pthread_key_t *routine_key)
@@ -1037,7 +1139,7 @@ static hostbuf_wrap *get_hostbuf(pthread_once_t *routine_once, void (*__init_rou
 		if ( ret ) {
 			if ( p ) {
 				free(p);
-				p = __null;
+				p = NULL;
 			}
 		}
 	}
@@ -1069,8 +1171,7 @@ struct hostent *co_gethostbyname(const char *name)
     int *h_errnop = &(hbw->host_errno);
 
     int ret = -1;
-    while (ret = gethostbyname_r(name, host, hbw->buffer, 
-                hbw->iBufferSize, &result, h_errnop) == ERANGE && 
+    while ((ret = gethostbyname_r(name, host, hbw->buffer, hbw->iBufferSize, &result, h_errnop) == ERANGE) && 
                 *h_errnop == NETDB_INTERNAL )
     {
         free(hbw->buffer);

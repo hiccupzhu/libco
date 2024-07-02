@@ -9,7 +9,12 @@
         "limits": "cpp",
         "new": "cpp",
         "type_traits": "cpp",
-        "coctx.h": "c"
+        "coctx.h": "c",
+        "*.tcc": "c",
+        "string": "c",
+        "unordered_map": "c",
+        "string_view": "c",
+        "ranges": "c"
     },
     "files.exclude": {
         "**/.git": true,
