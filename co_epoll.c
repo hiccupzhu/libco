@@ -24,6 +24,9 @@
 
 #if !defined( __APPLE__ ) && !defined( __FreeBSD__ )
 
+/*
+* timeout : ms
+*/
 int	co_epoll_wait( int epfd,struct co_epoll_res *events,int maxevents,int timeout )
 {
 	return epoll_wait( epfd,events->events,maxevents,timeout );

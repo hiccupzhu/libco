@@ -175,7 +175,7 @@ struct stCoEpoll_t
     co_epoll_res *result; 
 
 };
-typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event *ev, stTimeoutItemLink_t *active );
+typedef void (*OnPreparePfn_t)( struct epoll_event *ev, stTimeoutItemLink_t *active );
 typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
 #define eMaxTimeout (40000) /*40s*/
 
@@ -224,7 +224,7 @@ void FreeTimeout( stTimeout_t *apTimeout )
 
 // 添加超时事件
 // return 0 success, otherwize failed.
-int AddTimeout( stTimeout_t *apTimeout, stTimeoutItem_t *apItem ,unsigned long long allNow )
+int AddTimeout( stTimeout_t *apTimeout, stTimeoutItem_t *apItem , uint64_t allNow )
 {
     if( apTimeout->ullStart == 0 )
     {
@@ -550,6 +550,7 @@ typedef struct stPoll_t
 
     int iRaiseCnt;
 }stPoll_t;
+
 typedef struct stPollItem_t
 {
     ST_TIMEOUT_ITEM_COMMON;
@@ -623,11 +624,10 @@ void OnPollProcessEvent( stTimeoutItem_t * ap )
     co_resume( co );
 }
 
-void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event *e,stTimeoutItemLink_t *active )
+void OnPollPreparePfn( struct epoll_event *e, stTimeoutItemLink_t *active )
 {
-    stPollItem_t *lp = (stPollItem_t *)ap;
+    stPollItem_t *lp = (stPollItem_t *)e->data.ptr;
     lp->pSelf->revents = EpollEvent2Poll( e->events );
-
 
     stPoll_t *pPoll = lp->pPoll;
     pPoll->iRaiseCnt++;
@@ -665,7 +665,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
             stTimeoutItem_t *item = (stTimeoutItem_t*)result->events[i].data.ptr;
             if( item->pfnPrepare )
             {
-                item->pfnPrepare( item, &result->events[i],active );
+                item->pfnPrepare( &result->events[i], active );
             }
             else
             {
@@ -679,9 +679,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
         TakeAllTimeout( ctx->pTimeout,now,timeout );
 
         stTimeoutItem_t *lp = (stTimeoutItem_t *)timeout->head;
-        while( lp )
-        {
-            //printf("raise timeout %p\n",lp);
+        while( lp ) {
             lp->bTimeout = 1;
             lp = (stTimeoutItem_t *)lp->entry.flink;
         }
@@ -689,9 +687,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
         dq_cat(timeout, active);
 
         lp = (stTimeoutItem_t *)active->head;
-        while( lp )
-        {
-
+        while( lp ) {
             dq_remfirst(active);
             if (lp->bTimeout && now < lp->ullExpireTime) 
             {
@@ -974,7 +970,8 @@ int co_cond_signal( stCoCond_t *list )
     if (sp->timeout.pLink)
         dq_rem(&sp->timeout.entry, sp->timeout.pLink);
 
-    sp->pLink = co_get_curr_thread_env()->pEpoll->pstActiveList;
+    stCoRoutineEnv_t *env = co_get_curr_thread_env();
+    sp->pLink = env->pEpoll->pstActiveList;
     dq_addlast(&sp->timeout.entry, sp->pLink);
 
     return 0;

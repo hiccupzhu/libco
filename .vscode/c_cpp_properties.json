@@ -6,7 +6,8 @@
                 "${workspaceFolder}/**"
             ],
             "defines": [
-                "__i386__"
+                "__i386__",
+                "_GNU_SOURCE"
             ],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",

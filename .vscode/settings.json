@@ -14,7 +14,8 @@
         "string": "c",
         "unordered_map": "c",
         "string_view": "c",
-        "ranges": "c"
+        "ranges": "c",
+        "dl_find_object.h": "c"
     },
     "files.exclude": {
         "**/.git": true,

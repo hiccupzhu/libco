@@ -26,6 +26,7 @@ v=debug
 ##### Makefile Rules ##########
 MAIL_ROOT=.
 SRCROOT=.
+ARCH_BITS=64
 
 ##define the compliers
 CPP = $(CXX)
@@ -86,14 +87,14 @@ BUILDSHARELIB = $(CPPSHARE) $@.tmp $^ $(BS_FLAGS); \
 
 ########## options ##########
 CFLAGS += -g -fno-strict-aliasing -O0 -Wall -export-dynamic \
-	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m32
+	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m$(ARCH_BITS)
 
 UNAME := $(shell uname -s)
 
 ifeq ($(UNAME), FreeBSD)
-LINKS += -g -L./lib -lcolib -lpthread -m32
+LINKS += -g -L./lib -lcolib -lpthread -m$(ARCH_BITS)
 else
-LINKS += -g -L./lib -lcolib -lpthread -ldl -m32
+LINKS += -g -L./lib -lcolib -lpthread -ldl -m$(ARCH_BITS)
 endif
 
 PROGS = colib example_poll example_echosvr example_echocli example_thread \

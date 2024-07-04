@@ -41,12 +41,14 @@
 #include <netdb.h>
 
 #include <time.h>
+#include <dlfcn.h>
 #include "rbtree.h"
 #include "co_routine.h"
 #include "co_routine_inner.h"
 #include "co_routine_specific.h"
 
-typedef long long ll64_t;
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
 typedef struct rpchook_t
 {
@@ -205,9 +207,9 @@ struct rpchook_connagent_head_t
 
 #define HOOK_SYS_FUNC(name) if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
-static inline ll64_t diff_ms(struct timeval *begin,struct timeval *end)
+static inline int64_t diff_ms(struct timeval *begin,struct timeval *end)
 {
-    ll64_t u = (end->tv_sec - begin->tv_sec) ;
+    int64_t u = (end->tv_sec - begin->tv_sec) ;
     u *= 1000 * 10;
     u += ( end->tv_usec - begin->tv_usec ) / (  100 );
     return u;
@@ -217,7 +219,7 @@ static inline ll64_t diff_ms(struct timeval *begin,struct timeval *end)
 
 static inline rpchook_t * get_by_fd( int fd )
 {
-    if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
+    if( fd > -1 && fd < ARRAY_SIZE(g_rpchook_socket_fd) )
     {
         return g_rpchook_socket_fd[ fd ];
     }
@@ -225,7 +227,7 @@ static inline rpchook_t * get_by_fd( int fd )
 }
 static inline rpchook_t * alloc_by_fd( int fd )
 {
-    if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
+    if( fd > -1 && fd < ARRAY_SIZE(g_rpchook_socket_fd) )
     {
         rpchook_t *lp = (rpchook_t*)calloc( 1,sizeof(rpchook_t) );
         lp->read_timeout.tv_sec = 1;
@@ -237,7 +239,7 @@ static inline rpchook_t * alloc_by_fd( int fd )
 }
 static inline void free_by_fd( int fd )
 {
-    if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
+    if( fd > -1 && fd < ARRAY_SIZE(g_rpchook_socket_fd) )
     {
         rpchook_t *lp = g_rpchook_socket_fd[ fd ];
         if( lp )
