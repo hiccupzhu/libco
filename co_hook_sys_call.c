@@ -49,6 +49,7 @@
 
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#define HOOK_SYS_FUNC(name) if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
 typedef struct rpchook_t
 {
@@ -135,31 +136,30 @@ static __poll_pfn_t g_sys___poll_func = NULL;
 
 void sys_hook_call_init()
 {
-    g_sys_socket_func     = (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
-    g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
-    g_sys_close_func     = (close_pfn_t)dlsym(RTLD_NEXT,"close");
+    g_sys_socket_func          = (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
+    g_sys_connect_func         = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
+    g_sys_close_func           = (close_pfn_t)dlsym(RTLD_NEXT,"close");
 
-    g_sys_read_func         = (read_pfn_t)dlsym(RTLD_NEXT,"read");
-    g_sys_write_func     = (write_pfn_t)dlsym(RTLD_NEXT,"write");
+    g_sys_read_func            = (read_pfn_t)dlsym(RTLD_NEXT,"read");
+    g_sys_write_func           = (write_pfn_t)dlsym(RTLD_NEXT,"write");
 
-    g_sys_sendto_func     = (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
-    g_sys_recvfrom_func = (recvfrom_pfn_t)dlsym(RTLD_NEXT,"recvfrom");
+    g_sys_sendto_func          = (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
+    g_sys_recvfrom_func        = (recvfrom_pfn_t)dlsym(RTLD_NEXT,"recvfrom");
 
-    g_sys_send_func         = (send_pfn_t)dlsym(RTLD_NEXT,"send");
-    g_sys_recv_func         = (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
+    g_sys_send_func            = (send_pfn_t)dlsym(RTLD_NEXT,"send");
+    g_sys_recv_func            = (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
 
-    g_sys_poll_func         = (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
+    g_sys_poll_func            = (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
 
-    g_sys_setsockopt_func 
-                                            = (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
-    g_sys_fcntl_func     = (fcntl_pfn_t)dlsym(RTLD_NEXT,"fcntl");
+    g_sys_setsockopt_func      = (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
+    g_sys_fcntl_func           = (fcntl_pfn_t)dlsym(RTLD_NEXT,"fcntl");
 
-    g_sys_setenv_func   = (setenv_pfn_t)dlsym(RTLD_NEXT,"setenv");
-    g_sys_unsetenv_func = (unsetenv_pfn_t)dlsym(RTLD_NEXT,"unsetenv");
-    g_sys_getenv_func   =  (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv");
-    g_sys___res_state_func  = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
+    g_sys_setenv_func          = (setenv_pfn_t)dlsym(RTLD_NEXT,"setenv");
+    g_sys_unsetenv_func        = (unsetenv_pfn_t)dlsym(RTLD_NEXT,"unsetenv");
+    g_sys_getenv_func          =  (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv");
+    g_sys___res_state_func     = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
 
-    g_sys_gethostbyname_func = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
+    g_sys_gethostbyname_func   = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
     g_sys_gethostbyname_r_func = (gethostbyname_r_pfn_t)dlsym(RTLD_NEXT, "gethostbyname_r");
 
     g_sys___poll_func = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
@@ -193,20 +193,6 @@ static inline unsigned long long get_tick_count()
     return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
 }
 
-struct rpchook_connagent_head_t
-{
-    unsigned char    bVersion;
-    struct in_addr   iIP;
-    unsigned short   hPort;
-    unsigned int     iBodyLen;
-    unsigned int     iOssAttrID;
-    unsigned char    bIsRespNotExist;
-    unsigned char    sReserved[6];
-}__attribute__((packed));
-
-
-#define HOOK_SYS_FUNC(name) if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
-
 static inline int64_t diff_ms(struct timeval *begin,struct timeval *end)
 {
     int64_t u = (end->tv_sec - begin->tv_sec) ;
@@ -214,8 +200,6 @@ static inline int64_t diff_ms(struct timeval *begin,struct timeval *end)
     u += ( end->tv_usec - begin->tv_usec ) / (  100 );
     return u;
 }
-
-
 
 static inline rpchook_t * get_by_fd( int fd )
 {
@@ -225,6 +209,7 @@ static inline rpchook_t * get_by_fd( int fd )
     }
     return NULL;
 }
+
 static inline rpchook_t * alloc_by_fd( int fd )
 {
     if( fd > -1 && fd < ARRAY_SIZE(g_rpchook_socket_fd) )

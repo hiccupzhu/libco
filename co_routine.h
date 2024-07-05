@@ -23,6 +23,11 @@
 #include <sys/poll.h>
 #include <pthread.h>
 
+#define CO_LOG_INFO( fmt, args... ) \
+    do { \
+        fprintf( stdout, "[%s:%d]" fmt, __func__, __LINE__, ##args ); \
+    } while(0)
+
 __BEGIN_DECLS
 //1.struct
 

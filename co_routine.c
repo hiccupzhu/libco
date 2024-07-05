@@ -39,6 +39,7 @@
 #include <limits.h>
 #include "queue.h"
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
 // 将当前的上下文保存到from中，将to的上下文切换到当前上下文
 extern void coctx_swap( coctx_t *from, coctx_t* to) asm("coctx_swap");
@@ -261,37 +262,34 @@ int AddTimeout( stTimeout_t *apTimeout, stTimeoutItem_t *apItem , uint64_t allNo
 
     return 0;
 }
-static inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stTimeoutItemLink_t *apResult )
+static inline void TakeAllTimeout(stTimeout_t *apTimeout, unsigned long long allNow, stTimeoutItemLink_t *apResult)
 {
-    if( apTimeout->ullStart == 0 )
-    {
+    if (apTimeout->ullStart == 0) {
         apTimeout->ullStart = allNow;
         apTimeout->llStartIdx = 0;
     }
 
-    if( allNow < apTimeout->ullStart )
-    {
-        return ;
-    }
-    int cnt = allNow - apTimeout->ullStart + 1;
-    if( cnt > apTimeout->iItemSize )
-    {
-        cnt = apTimeout->iItemSize;
-    }
-    if( cnt < 0 )
-    {
+    if (allNow < apTimeout->ullStart) {
         return;
     }
-    for( int i = 0;i<cnt;i++)
-    {
-        int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
+
+    int cnt = allNow - apTimeout->ullStart + 1;
+    if (cnt > apTimeout->iItemSize) {
+        cnt = apTimeout->iItemSize;
+    }
+    if (cnt < 0) {
+        return;
+    }
+
+    for (int i = 0; i < cnt; i++) {
+        int idx = (apTimeout->llStartIdx + i) % apTimeout->iItemSize;
         dq_cat(apTimeout->pItems + idx, apResult);
     }
+
     apTimeout->ullStart = allNow;
     apTimeout->llStartIdx += cnt - 1;
-
-
 }
+
 static int CoRoutineFunc( stCoRoutine_t *co,void * )
 {
     if( co->pfn )
@@ -372,7 +370,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
     return lp;
 }
 
-int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine_t pfn,void *arg )
+int co_create(stCoRoutine_t **ppco, const stCoRoutineAttr_t *attr, pfn_co_routine_t pfn, void *arg)
 {
     if( !co_get_curr_thread_env() ) 
     {
@@ -621,6 +619,7 @@ stCoRoutineEnv_t *co_get_curr_thread_env()
 void OnPollProcessEvent( stTimeoutItem_t * ap )
 {
     stCoRoutine_t *co = (stCoRoutine_t*)ap->pArg;
+    //CO_LOG_INFO("OnPollProcessEvent,co %p ", co);
     co_resume( co );
 }
 
@@ -642,25 +641,23 @@ void OnPollPreparePfn( struct epoll_event *e, stTimeoutItemLink_t *active )
     }
 }
 
-
-void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
+void co_eventloop(stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg)
 {
-    if( !ctx->result )
-    {
-        ctx->result =  co_epoll_res_alloc( _EPOLL_SIZE );
+    if (!ctx->result) {
+        ctx->result = co_epoll_res_alloc(_EPOLL_SIZE);
     }
     co_epoll_res *result = ctx->result;
 
     for(;;)
     {
-        int ret = co_epoll_wait( ctx->iEpollFd,result,_EPOLL_SIZE, 1 );
+        int ret = co_epoll_wait(ctx->iEpollFd, result, _EPOLL_SIZE, 1);
 
         stTimeoutItemLink_t *active = (ctx->pstActiveList);
         stTimeoutItemLink_t *timeout = (ctx->pstTimeoutList);
 
-        memset( timeout,0,sizeof(stTimeoutItemLink_t) );
+        memset( timeout, 0, sizeof(stTimeoutItemLink_t) );
 
-        for(int i=0;i<ret;i++)
+        for (int i = 0; i < ret; i++)
         {
             stTimeoutItem_t *item = (stTimeoutItem_t*)result->events[i].data.ptr;
             if( item->pfnPrepare )
@@ -674,9 +671,8 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
             }
         }
 
-
         unsigned long long now = GetTickMS();
-        TakeAllTimeout( ctx->pTimeout,now,timeout );
+        TakeAllTimeout(ctx->pTimeout, now, timeout);
 
         stTimeoutItem_t *lp = (stTimeoutItem_t *)timeout->head;
         while( lp ) {
@@ -684,16 +680,34 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
             lp = (stTimeoutItem_t *)lp->entry.flink;
         }
 
+        dq_entry_t *e = NULL;
+        int old_tmout_cnt = dq_count(timeout);
+        if (0 && old_tmout_cnt) {
+            stTimeoutItem_t * ti = (stTimeoutItem_t *)timeout->head;
+            CO_LOG_INFO("    ++timeout-cnt:%d active-cnt:%d expireTime-now=%llu-%llu=%lld arg:%p\n",
+                dq_count(timeout), dq_count(active),
+                ti->ullExpireTime, now, (int64_t)(ti->ullExpireTime - now),
+                ti->pArg);
+        }
         dq_cat(timeout, active);
+        if (dq_count(active) > 1) {
+            CO_LOG_INFO("    --timeout-cnt:%d active-cnt:%d\n", old_tmout_cnt, dq_count(active));
+            dq_for_every(active, e) {
+                lp = (stTimeoutItem_t *)e;
+                CO_LOG_INFO("    ----active arg:%p\n", lp->pArg);
+            }
+        }
 
-        lp = (stTimeoutItem_t *)active->head;
-        while( lp ) {
-            dq_remfirst(active);
+        for (; lp = (stTimeoutItem_t *)dq_remfirst(active);)
+        {
             if (lp->bTimeout && now < lp->ullExpireTime) 
             {
+                CO_LOG_INFO("CO_ERR: find timeout timer, but not expire. now %lld expire %lld\n",
+                    now, lp->ullExpireTime);
                 int ret = AddTimeout(ctx->pTimeout, lp, now);
-                if (!ret) 
+                if (!ret)
                 {
+                    CO_LOG_INFO("CO_ERR: AddTimeout failed. ");
                     lp->bTimeout = 0;
                     lp = (stTimeoutItem_t *)active->head;
                     continue;
@@ -703,8 +717,6 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
             {
                 lp->pfnProcess( lp );
             }
-
-            lp = (stTimeoutItem_t *)active->head;
         }
         if( pfn )
         {
@@ -787,7 +799,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
     arg->nfds = nfds;
 
     stPollItem_t arr[2];
-    if( nfds < sizeof(arr) / sizeof(arr[0]) && !self->cIsShareStack)
+    if( nfds < ARRAY_SIZE(arr) && !self->cIsShareStack)
     {
         arg->pPollItems = arr;
     }    
@@ -799,10 +811,9 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 
     arg->pfnProcess = OnPollProcessEvent;
     arg->pArg = GetCurrCo( co_get_curr_thread_env() );
-    
-    
+
     //2. add epoll
-    for(nfds_t i=0;i<nfds;i++)
+    for (nfds_t i = 0; i < nfds; i++)
     {
         arg->pPollItems[i].pSelf = arg->fds + i;
         arg->pPollItems[i].pPoll = arg;
@@ -818,6 +829,8 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
             int ret = co_epoll_ctl( epfd,EPOLL_CTL_ADD, fds[i].fd, ev );
             if (ret < 0 && errno == EPERM && nfds == 1 && pollfunc != NULL)
             {
+                CO_LOG_INFO("##### epoll add fail,fd %d events 0x%X", fds[i].fd, ev->events);
+
                 if( arg->pPollItems != arr )
                 {
                     free( arg->pPollItems );
@@ -839,8 +852,8 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
     int iRaiseCnt = 0;
     if( ret != 0 )
     {
-        co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
-                ret,now,timeout, arg->ullExpireTime);
+        CO_LOG_INFO("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
+                    ret, now, timeout, arg->ullExpireTime);
         errno = EINVAL;
         iRaiseCnt = -1;
 
@@ -852,8 +865,10 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
     }
 
     {
-        //clear epoll status and memory
-        dq_rem(&arg->entry, arg->pLink);
+        // FIXME: 源代码是要dq_rem，但是会导致主loop中的timeout链表被破坏
+        // 后期需要研究是否是源码本身的问题
+        // clear epoll status and memory
+        // dq_rem(&arg->entry, arg->pLink);
         for(nfds_t i = 0;i < nfds;i++)
         {
             int fd = fds[i].fd;
@@ -1003,7 +1018,7 @@ int co_cond_timedwait( dq_queue_t *link, int ms )
         unsigned long long now = GetTickMS();
         psi->timeout.ullExpireTime = now + ms;
 
-        int ret = AddTimeout( co_get_curr_thread_env()->pEpoll->pTimeout,&psi->timeout,now );
+        int ret = AddTimeout(co_get_curr_thread_env()->pEpoll->pTimeout, &psi->timeout, now);
         if( ret != 0 )
         {
             free(psi);
